@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>wrss</title>
+<link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body data-prefix="{{ prefix }}">
+<div id="app">
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="logo">w<span class="logo-dot">●</span>rss</div>
+      <div class="logo-sub">aggregated reader</div>
+    </div>
+    <input id="search" type="search" placeholder="Search articles…" autocomplete="off">
+    <nav>
+      <div class="side-title">Feeds</div>
+      <button class="nav-item active" data-kind="">All news <span class="badge" data-badge="all"></span></button>
+      <button class="nav-item" data-kind="native">Native <span class="badge" data-badge="native"></span></button>
+      <button class="nav-item" data-kind="foreign">Foreign <span class="badge" data-badge="foreign"></span></button>
+      <div id="section-list"></div>
+      <div class="side-title">Categories</div>
+      <div id="cat-list"></div>
+    </nav>
+    <div class="side-footer">
+      <div id="status-line">loading…</div>
+      <div class="side-actions">
+        <button id="btn-refresh" class="btn ghost">⟳ Refresh</button>
+        <button id="btn-manage" class="btn ghost">⚙ Feeds</button>
+        <button id="btn-admin" class="btn ghost">🛠 Admin</button>
+      </div>
+    </div>
+  </aside>
+
+  <div id="scrim"></div>
+
+  <main id="main">
+    <header id="topbar">
+      <button id="btn-menu" class="btn ghost icon" title="Menu">☰</button>
+      <h1 id="filter-title">All news</h1>
+      <span id="count-chip" class="chip"></span>
+      <span class="spacer"></span>
+      <label class="toggle" title="Show unread only">
+        <input type="checkbox" id="unread-only"><span>Unread</span>
+      </label>
+      <label class="toggle" title="Automatically translate visible foreign headlines">
+        <input type="checkbox" id="auto-translate"><span>Auto-translate</span>
+      </label>
+      <span id="auto-status" class="chip hidden"></span>
+      <button id="btn-readall" class="btn ghost" title="Mark everything in this view as read"><span>✓ All read</span></button>
+      <button id="btn-theme" class="btn ghost icon" title="Toggle light/dark">☾</button>
+      <a id="btn-logout" class="btn ghost icon" title="Sign out" href="/sso/logout">⎋</a>
+    </header>
+    <div id="articles"></div>
+    <div id="empty" class="empty hidden">
+      <div class="empty-icon">📡</div>
+      <div class="empty-title">Nothing here yet</div>
+      <div class="empty-sub">No articles match this view. Try refreshing or changing filters.</div>
+    </div>
+    <button id="btn-more" class="btn ghost wide hidden">Load more</button>
+    <footer id="foot">
+      feed for reader apps: <code id="feed-url"></code>
+    </footer>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>Manage feeds</h2>
+      <button id="btn-modal-close" class="btn ghost icon">✕</button>
+    </div>
+    <form id="add-form" class="add-form">
+      <input id="add-name" placeholder="Name (optional)">
+      <input id="add-url" placeholder="Feed URL*" required>
+      <select id="add-kind">
+        <option value="native">native (DE/EN)</option>
+        <option value="foreign">foreign (translate)</option>
+      </select>
+      <input id="add-cat" placeholder="Category" list="cat-options">
+      <input id="add-region" placeholder="Section (Europe…)" list="region-options">
+      <input id="add-country" placeholder="Country">
+      <datalist id="cat-options"></datalist>
+      <datalist id="region-options"></datalist>
+      <button type="submit" class="btn primary">Add feed</button>
+    </form>
+    <div id="feeds-list" class="feeds-list"></div>
+    <div class="modal-foot">
+      <span id="modal-msg"></span>
+    </div>
+  </div>
+</div>
+
+<div id="admin" class="modal hidden">
+  <div class="modal-card admin-card">
+    <div class="modal-head">
+      <h2>Admin</h2>
+      <button id="btn-admin-close" class="btn ghost icon">✕</button>
+    </div>
+
+    <div id="admin-status" class="admin-status">loading…</div>
+    <div id="drain-bar" class="drain hidden">
+      <div class="drain-track"><div id="drain-fill" class="drain-fill"></div></div>
+      <div id="drain-label" class="drain-label"></div>
+    </div>
+
+    <div class="admin-block">
+      <div class="side-title">Translation</div>
+      <label class="toggle admin-master">
+        <input type="checkbox" id="ad-enabled"><span>Translate foreign headlines</span>
+      </label>
+      <div class="admin-fields">
+        <label class="admin-field">
+          <span>Daily budget</span>
+          <input type="number" id="ad-budget" min="0" step="10">
+        </label>
+        <label class="admin-field">
+          <span>Per tick</span>
+          <input type="number" id="ad-per-tick" min="1" step="1">
+        </label>
+        <label class="admin-field">
+          <span>Window from</span>
+          <input type="number" id="ad-win-start" min="0" max="23" step="1">
+        </label>
+        <label class="admin-field">
+          <span>Window to</span>
+          <input type="number" id="ad-win-end" min="0" max="23" step="1">
+        </label>
+      </div>
+      <p class="admin-note">
+        The budget counts provider calls per UTC day, matching when OpenRouter resets.
+        The window is in local time and may wrap past midnight. Same start and end means
+        always on.
+      </p>
+      <div class="admin-actions">
+        <button id="ad-now" class="btn">▶ Translate queued now</button>
+        <span class="admin-hint">drains the backlog on the batch lane, ignoring the window, budget and pause switch</span>
+      </div>
+    </div>
+
+    <div class="admin-block">
+      <div class="side-title">Ongoing lane <span class="faint">— steady trickle, per-headline clicks, article bodies</span></div>
+      <div class="admin-fields">
+        <label class="admin-field wide">
+          <span>Model (key label via proxy, id incl. :floor when direct)</span>
+          <input type="text" id="ad-ongoing-model" maxlength="200" autocomplete="off">
+        </label>
+        <label class="admin-field">
+          <span>Price in / 1M</span>
+          <input type="number" id="ad-ongoing-price-in" min="0" step="0.0001">
+        </label>
+        <label class="admin-field">
+          <span>Price out / 1M</span>
+          <input type="number" id="ad-ongoing-price-out" min="0" step="0.0001">
+        </label>
+      </div>
+      <div id="ad-ongoing-spend" class="admin-note"></div>
+    </div>
+
+    <div class="admin-block">
+      <div class="side-title">Batch lane <span class="faint">— forced drain only, LLMPROXY_KEY_BATCH</span></div>
+      <div class="admin-fields">
+        <label class="admin-field wide">
+          <span>Model (key label via proxy, id incl. :floor when direct)</span>
+          <input type="text" id="ad-batch-model" maxlength="200" autocomplete="off">
+        </label>
+        <label class="admin-field">
+          <span>Price in / 1M</span>
+          <input type="number" id="ad-batch-price-in" min="0" step="0.0001">
+        </label>
+        <label class="admin-field">
+          <span>Price out / 1M</span>
+          <input type="number" id="ad-batch-price-out" min="0" step="0.0001">
+        </label>
+      </div>
+      <div id="ad-batch-spend" class="admin-note"></div>
+      <p class="admin-note">
+        Secrets stay in <code>.env</code> (<code>LLMPROXY_KEY*</code>); only the model
+        label and list prices are set here. Prices are display-only: edit them when
+        the lane's model changes so the spend line stays honest.
+      </p>
+    </div>
+
+    <div class="admin-block">
+      <div class="side-title">Sections &amp; countries</div>
+      <div class="group-head">
+        <span></span><span>Pull</span><span>Translate</span><span></span>
+      </div>
+      <div id="ad-groups" class="group-list"></div>
+      <p class="admin-note">
+        Pull switches fetching new articles for every feed in the group. Translate
+        switches translating their untranslated headlines. Already-translated headlines
+        are kept either way.
+      </p>
+    </div>
+
+    <div class="admin-block danger-zone">
+      <div class="side-title">Backlog</div>
+      <p class="admin-note">
+        Deletes every untranslated foreign article. Already-translated articles and all
+        native articles are kept. This cannot be undone.
+      </p>
+      <button id="ad-purge" class="btn danger">Delete untranslated backlog</button>
+    </div>
+
+    <div class="modal-foot admin-foot">
+      <span id="admin-msg"></span>
+      <span class="spacer"></span>
+      <button id="admin-save" class="btn primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="reader" class="modal hidden">
+  <div class="modal-card reader-card">
+    <div class="modal-head">
+      <h2 id="reader-title">Article</h2>
+      <button id="btn-reader-close" class="btn ghost icon">✕</button>
+    </div>
+    <div class="reader-bar">
+      <span id="reader-src" class="reader-src"></span>
+      <a id="reader-gt" class="btn ghost" target="_blank" rel="noopener" hidden>Open in Google Translate ↗</a>
+      <a id="reader-orig" class="btn ghost" target="_blank" rel="noopener" hidden>Original ↗</a>
+    </div>
+    <div id="reader-body" class="reader"></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

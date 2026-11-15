@@ -1,0 +1,101 @@
+# Shared .gitignore for the projects on this box.
+#
+# Copy into a project directory before its first commit (see onboard.sh), or
+# merge the relevant parts into a .gitignore the project already has.
+#
+# The rule this file exists to enforce: git history is permanent. A credential
+# committed once is readable by anyone who can clone, forever, even after it is
+# deleted in a later commit — so the exclusion has to happen *before* the first
+# commit, not after.
+
+# --- credentials ---
+# Every service on this box keeps its secrets in a 0600 .env owned by its own
+# account. There are 14 of them and several hold spendable provider keys:
+# llmproxy and wbot alone can spend money. None of them belong in git.
+.env
+.env.*
+# ...except the sanitized templates, which document the variables without
+# values and are worth committing.
+!.env.example
+
+# Private keys. Three exist on this box:
+#   backup_manager/archived_keys/wma_w_inbox_li_key.key
+#   personal_casino/casino_secret.key
+#   wmon/monitoring_master_key.key
+*.key
+*.pem
+*.key.pub
+!*.pub
+
+# SSH material, in case any project grows one
+id_rsa
+id_ed25519
+id_ecdsa
+*.ppk
+.netrc
+auth.json
+*credentials*
+*secret*
+
+# --- databases ---
+# These are runtime state, not source. Several are large:
+#   apple_health/health.db      119 MB
+#   server-predb/predb.sqlite   124 MB with nfos
+# A committed database also means every future commit stores a full copy of
+# every row ever written.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sql.gz
+
+# --- pre-existing backups ---
+# Ten of these were already on the box before this file existed, from the
+# 2026-09-27/28 migration work. They are copies of files that are either in
+# the repo already (a stale .py.bak) or deliberately excluded (a 2.6 MB
+# wrss.db.bak). Git is the history mechanism now; keeping dated copies of it
+# alongside it is duplication that gets committed forever.
+*.bak
+*.bak.*
+*.bak-*
+*.backup
+*.old
+*.orig
+*.rej
+
+# --- runtime data ---
+*.log
+logs/
+data/
+traces/
+nfos/
+*.pid
+*.sock
+
+# --- python ---
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# --- node ---
+node_modules/
+.next/
+dist/
+build/
+*.tsbuildinfo
+
+# --- editors / OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+AGENTS.md
